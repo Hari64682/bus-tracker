@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>{{ bus }} – Live Tracking</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#c9a84c;--gold-light:#e8c97a;
+    --dark:#0a0c0f;--dark2:rgba(12,15,20,0.92);
+    --text:#e8e4dc;--muted:#7a7a7a;--border:rgba(201,168,76,0.2);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--dark);}
+  #map{position:fixed;inset:0;z-index:1;}
+
+  .topbar{
+    position:fixed;top:0;left:0;right:0;z-index:1000;
+    background:var(--dark2);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border-bottom:1px solid var(--border);
+    padding:12px 16px;
+    display:flex;align-items:center;gap:12px;
+  }
+  .back-btn{
+    background:rgba(201,168,76,0.1);border:1px solid var(--border);
+    color:var(--gold);width:36px;height:36px;border-radius:50%;
+    font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    transition:all .2s;flex-shrink:0;text-decoration:none;
+  }
+  .back-btn:hover{background:rgba(201,168,76,0.2);}
+  .topbar-info{flex:1;min-width:0;}
+  .bus-id{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--gold-light);line-height:1.2;}
+  .route-sub{font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  .status-badge{
+    display:flex;align-items:center;gap:6px;
+    background:rgba(201,168,76,0.07);border:1px solid var(--border);
+    border-radius:20px;padding:5px 12px;
+    font-size:11px;color:var(--text);letter-spacing:1px;flex-shrink:0;
+    font-family:'Jost',sans-serif;text-transform:uppercase;
+  }
+  .badge-dot{width:7px;height:7px;border-radius:50%;background:#374151;transition:background .3s;flex-shrink:0;}
+  .badge-dot.live{background:#22c55e;animation:blink 1.5s infinite;}
+  .badge-dot.stale{background:#f59e0b;}
+  .badge-dot.offline{background:#ef4444;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  /* satellite toggle button - bottom left */
+  .map-toggle{
+    position:fixed;bottom:160px;left:16px;z-index:1000;
+    background:var(--dark2);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    border:1px solid var(--border);border-radius:10px;
+    overflow:hidden;
+  }
+  .toggle-btn{
+    display:flex;align-items:center;gap:8px;
+    padding:10px 14px;cursor:pointer;
+    font-family:'Jost',sans-serif;font-size:12px;letter-spacing:1px;
+    text-transform:uppercase;color:var(--muted);
+    border:none;background:transparent;width:100%;
+    transition:all .2s;border-bottom:1px solid var(--border);
+  }
+  .toggle-btn:last-child{border-bottom:none;}
+  .toggle-btn.active{color:var(--gold);background:rgba(201,168,76,0.08);}
+  .toggle-btn:hover{background:rgba(255,255,255,0.05);}
+  .toggle-btn .icon{font-size:16px;}
+
+  .bottom-card{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    z-index:1000;
+    background:var(--dark2);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid var(--border);border-radius:3px;
+    padding:16px 24px;min-width:300px;max-width:94vw;
+  }
+  .bottom-card::before,.bottom-card::after{content:'';position:absolute;width:12px;height:12px;}
+  .bottom-card::before{top:0;left:0;border-top:1px solid var(--gold);border-left:1px solid var(--gold);}
+  .bottom-card::after{bottom:0;right:0;border-bottom:1px solid var(--gold);border-right:1px solid var(--gold);}
+
+  .stats-row{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+  .stat{text-align:center;flex:1;}
+  .stat .val{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--gold-light);}
+  .stat .key{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:2px;}
+  .vdivider{width:1px;background:var(--border);align-self:stretch;min-height:36px;}
+
+  .lbl{background:transparent!important;border:none!important;box-shadow:none!important;}
+  .label-pill{
+    background:rgba(12,15,20,0.9);color:var(--gold-light);
+    font-family:'Jost',sans-serif;font-size:12px;font-weight:500;
+    padding:4px 10px;border-radius:2px;border:1px solid var(--border);
+    box-shadow:0 2px 12px rgba(0,0,0,.4);white-space:nowrap;letter-spacing:.5px;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="back-btn" href="/">←</a>
+  <div class="topbar-info">
+    <div class="bus-id">{{ bus }} &nbsp;·&nbsp; {{ place }}</div>
+    <div class="route-sub">{{ place }} → SNGCE College</div>
+  </div>
+  <div class="status-badge">
+    <div class="badge-dot offline" id="badgeDot"></div>
+    <span id="badgeText">Loading</span>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<!-- Map type toggle - bottom left -->
+<div class="map-toggle">
+  <button class="toggle-btn active" id="btnStreet" onclick="setMapType('street')">
+    <span class="icon">🗺️</span> Street
+  </button>
+  <button class="toggle-btn" id="btnSatellite" onclick="setMapType('satellite')">
+    <span class="icon">🛰️</span> Satellite
+  </button>
+</div>
+
+<div class="bottom-card">
+  <div class="stats-row">
+    <div class="stat"><div class="val" id="distVal">—</div><div class="key">km to college</div></div>
+    <div class="vdivider"></div>
+    <div class="stat"><div class="val" id="etaVal">—</div><div class="key">arrival</div></div>
+    <div class="vdivider"></div>
+    <div class="stat"><div class="val" id="refreshVal">5s</div><div class="key">next update</div></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+  const COLLEGE = {{ college|tojson }};
+  const START   = {{ start|tojson }};
+  const BUS     = "{{ bus }}";
+  const PLACE   = "{{ place }}";
+
+  // ── MAP LAYERS ────────────────────────────────────────────────────────────
+  const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap'
+  });
+
+  const satelliteLayer = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    {attribution:'© Esri, Maxar, Earthstar Geographics'}
+  );
+
+  const map = L.map('map',{zoomControl:false}).setView(COLLEGE,13);
+  streetLayer.addTo(map);
+  L.control.zoom({position:'bottomright'}).addTo(map);
+
+  let currentMapType = 'street';
+
+  function setMapType(type){
+    if(type === currentMapType) return;
+    currentMapType = type;
+    if(type === 'satellite'){
+      map.removeLayer(streetLayer);
+      satelliteLayer.addTo(map);
+      document.getElementById('btnStreet').classList.remove('active');
+      document.getElementById('btnSatellite').classList.add('active');
+    } else {
+      map.removeLayer(satelliteLayer);
+      streetLayer.addTo(map);
+      document.getElementById('btnSatellite').classList.remove('active');
+      document.getElementById('btnStreet').classList.add('active');
+    }
+  }
+
+  // ── MARKERS ───────────────────────────────────────────────────────────────
+  const collegeIcon = L.divIcon({
+    className:'lbl',
+    html:'<div style="font-size:30px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.6))">🏫</div>',
+    iconSize:[40,40],iconAnchor:[20,20]
+  });
+  L.marker(COLLEGE,{icon:collegeIcon}).addTo(map)
+   .bindTooltip('<div class="label-pill">🏫 SNGCE College</div>',
+                {permanent:true,direction:'top',className:'lbl'});
+
+  const busIcon = L.divIcon({
+    className:'lbl',
+    html:'<div style="font-size:32px;filter:drop-shadow(0 3px 8px rgba(0,0,0,.5))">🚌</div>',
+    iconSize:[40,40],iconAnchor:[20,20]
+  });
+  let busMarker = L.marker(START,{icon:busIcon}).addTo(map);
+  busMarker.bindTooltip(
+    '<div class="label-pill">📍 '+PLACE+'</div>',
+    {permanent:true,direction:'top',className:'lbl'}
+  );
+
+  // ── ROUTE ─────────────────────────────────────────────────────────────────
+  let routeLine = null;
+  let lastRoutePos = null;
+
+  function drawRoute(busLat, busLng){
+    if(lastRoutePos){
+      const d = Math.abs(busLat-lastRoutePos[0])+Math.abs(busLng-lastRoutePos[1]);
+      if(d < 0.0001) return;
+    }
+    lastRoutePos = [busLat, busLng];
+
+    const url =
+      "https://router.project-osrm.org/route/v1/driving/"
+      + busLng+","+busLat+";"
+      + COLLEGE[1]+","+COLLEGE[0]
+      + "?overview=full&geometries=geojson";
+
+    fetch(url)
+      .then(r=>r.json())
+      .then(data=>{
+        const coords = data.routes[0].geometry.coordinates;
+        const latlngs = coords.map(c=>[c[1],c[0]]);
+        if(routeLine) map.removeLayer(routeLine);
+        routeLine = L.polyline(latlngs,{color:'#3b82f6',weight:6,opacity:0.9}).addTo(map);
+
+        const km  = (data.routes[0].distance/1000).toFixed(1);
+        const eta = new Date(Date.now()+data.routes[0].duration*1000)
+                      .toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+        document.getElementById('distVal').textContent = km;
+        document.getElementById('etaVal').textContent  = eta;
+      })
+      .catch(()=>{});
+  }
+
+  // ── STATUS ────────────────────────────────────────────────────────────────
+  function setStatus(type, text){
+    document.getElementById('badgeDot').className = 'badge-dot '+type;
+    document.getElementById('badgeText').textContent = text;
+  }
+
+  // ── GPS POLLING ───────────────────────────────────────────────────────────
+  let firstLoad = true;
+  let countdown = 5;
+
+  async function fetchLocation(){
+    try{
+      const r = await fetch('/api/location/'+BUS+'?t='+Date.now());
+      if(!r.ok) throw new Error('bad');
+      const d = await r.json();
+
+      if(d.live){
+        // Driver is sharing live GPS
+        busMarker.setLatLng([d.lat, d.lng]);
+        setStatus('live','Live');
+        drawRoute(d.lat, d.lng);
+
+      } else if(d.ts){
+        // Driver shared before but stopped — return bus to START
+        busMarker.setLatLng(START);
+        if(routeLine){ map.removeLayer(routeLine); routeLine=null; }
+        lastRoutePos = null;
+        setStatus('offline','Stopped');
+        document.getElementById('distVal').textContent = '—';
+        document.getElementById('etaVal').textContent  = '—';
+
+      } else {
+        // Never shared — show at start position with route
+        busMarker.setLatLng(START);
+        setStatus('offline','No Signal');
+        drawRoute(START[0], START[1]);
+      }
+
+      if(firstLoad){
+        firstLoad = false;
+        const pos = d.live ? [d.lat,d.lng] : START;
+        map.fitBounds(L.latLngBounds([pos, COLLEGE]),{padding:[80,80]});
+      }
+
+    }catch(e){
+      setStatus('offline','Offline');
+    }
+  }
+
+  function tick(){
+    countdown--;
+    document.getElementById('refreshVal').textContent = countdown+'s';
+    if(countdown<=0){ countdown=5; fetchLocation(); }
+  }
+
+  fetchLocation();
+  setInterval(tick,1000);
+</script>
+</body>
+</html>

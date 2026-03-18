@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Driver Panel – SNGCE Bus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#c9a84c;--gold-light:#e8c97a;
+    --dark:#0a0c0f;--dark2:#12151a;--dark3:#1c2028;
+    --text:#e8e4dc;--muted:#7a7a7a;--border:rgba(201,168,76,0.2);
+    --green:#16a34a;--red:#dc2626;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    min-height:100vh;background:var(--dark);
+    font-family:'Jost',sans-serif;color:var(--text);
+    display:flex;align-items:center;justify-content:center;padding:24px;
+  }
+  body::before{
+    content:'';position:fixed;inset:0;
+    background:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(201,168,76,0.06) 0%,transparent 70%);
+    pointer-events:none;
+  }
+  .page{width:100%;max-width:380px;position:relative;z-index:1;animation:fadeUp .6s ease both;}
+
+  .header{text-align:center;margin-bottom:28px;}
+  .crest{
+    width:52px;height:52px;background:linear-gradient(135deg,var(--gold),var(--gold-light));
+    border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:22px;margin:0 auto 14px;box-shadow:0 0 30px rgba(201,168,76,0.15),0 0 0 1px var(--border);
+  }
+  .sub-title{font-size:9px;letter-spacing:4px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;font-weight:500;}
+  h1{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:600;color:var(--text);}
+  h1 em{font-style:italic;color:var(--gold-light);}
+  .desc{font-size:12px;color:var(--muted);margin-top:8px;letter-spacing:.3px;font-weight:300;}
+
+  .card{
+    background:var(--dark2);border:1px solid var(--border);border-radius:3px;
+    padding:26px;margin-bottom:14px;position:relative;
+  }
+  .card::before,.card::after{content:'';position:absolute;width:14px;height:14px;}
+  .card::before{top:0;left:0;border-top:1px solid var(--gold);border-left:1px solid var(--gold);}
+  .card::after{bottom:0;right:0;border-bottom:1px solid var(--gold);border-right:1px solid var(--gold);}
+
+  .field-label{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;font-weight:500;}
+
+  .select-wrap{position:relative;margin-bottom:20px;}
+  .select-wrap::after{content:'▾';position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--gold);pointer-events:none;}
+  select{
+    width:100%;padding:12px 36px 12px 14px;
+    background:var(--dark3);border:1px solid var(--border);border-radius:2px;
+    color:var(--text);font-family:'Jost',sans-serif;font-size:14px;font-weight:300;
+    appearance:none;-webkit-appearance:none;cursor:pointer;outline:none;
+  }
+  select:focus{border-color:var(--gold);}
+  select option{background:#1c2028;}
+  select:disabled{opacity:.5;cursor:not-allowed;}
+
+  .btn{
+    display:block;width:100%;padding:14px;
+    font-family:'Jost',sans-serif;font-size:11px;font-weight:500;
+    letter-spacing:3px;text-transform:uppercase;
+    border:none;border-radius:2px;cursor:pointer;transition:all .2s;
+  }
+  #startBtn{background:linear-gradient(135deg,#16a34a,#22c55e);color:white;box-shadow:0 4px 20px rgba(22,163,74,0.2);}
+  #startBtn:hover{box-shadow:0 6px 28px rgba(22,163,74,0.35);transform:translateY(-1px);}
+  #stopBtn{background:linear-gradient(135deg,#dc2626,#ef4444);color:white;display:none;box-shadow:0 4px 20px rgba(220,38,38,0.2);margin-top:10px;}
+  #stopBtn:hover{transform:translateY(-1px);}
+
+  /* status panel */
+  #statusPanel{
+    background:var(--dark2);border:1px solid var(--border);border-radius:3px;
+    padding:20px;text-align:center;
+  }
+  .dot{
+    width:12px;height:12px;border-radius:50%;background:#374151;
+    display:inline-block;margin-bottom:10px;transition:background .3s;
+  }
+  .dot.live{background:var(--green);animation:pulse 1.5s infinite;}
+  .dot.error{background:var(--red);}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.4);}50%{box-shadow:0 0 0 8px rgba(22,163,74,0);}}
+
+  #statusText{font-size:13px;color:var(--muted);line-height:1.6;font-weight:300;}
+  #coords{font-size:11px;color:var(--gold);margin-top:8px;font-family:monospace;letter-spacing:.5px;}
+  #lastSent{font-size:10px;color:#444;margin-top:6px;letter-spacing:.5px;}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="crest">🚘</div>
+    <div class="sub-title">SNGCE College</div>
+    <h1><em>Driver</em> Panel</h1>
+    <p class="desc">Your GPS location will be shared live with students</p>
+  </div>
+
+  <div class="card">
+    <div class="field-label">Your Bus Number</div>
+    <div class="select-wrap">
+      <select id="busSelect">
+        {% for bus in buses %}
+        <option value="{{ bus }}">{{ bus }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="btn" id="startBtn" onclick="startTracking()">📡 &nbsp; Start Sharing Location</button>
+    <button class="btn" id="stopBtn" onclick="stopTracking()">⏹ &nbsp; Stop Sharing</button>
+  </div>
+
+  <div id="statusPanel">
+    <div class="dot" id="dot"></div>
+    <div id="statusText">Press Start to begin sharing your GPS location.</div>
+    <div id="coords"></div>
+    <div id="lastSent"></div>
+  </div>
+</div>
+
+<script>
+  let watchId=null, sendInterval=null, lastLat=null, lastLng=null;
+
+  function startTracking(){
+    if(!navigator.geolocation){setStatus('error','❌ GPS not supported on this device.');return;}
+    document.getElementById('startBtn').style.display='none';
+    document.getElementById('stopBtn').style.display='block';
+    document.getElementById('busSelect').disabled=true;
+    setStatus('searching','🔍 Getting GPS fix…');
+
+    watchId=navigator.geolocation.watchPosition(
+      pos=>{
+        lastLat=pos.coords.latitude; lastLng=pos.coords.longitude;
+        document.getElementById('coords').textContent=
+          'Lat: '+lastLat.toFixed(6)+'  ·  Lng: '+lastLng.toFixed(6)+
+          '\nAccuracy: ±'+Math.round(pos.coords.accuracy)+'m';
+        setStatus('live','📡 Live — sending every 5 seconds');
+      },
+      err=>{setStatus('error','❌ GPS error: '+err.message);},
+      {enableHighAccuracy:true,maximumAge:5000,timeout:15000}
+    );
+    sendInterval=setInterval(sendLocation,5000);
+  }
+
+  function stopTracking(){
+    if(watchId) navigator.geolocation.clearWatch(watchId);
+    clearInterval(sendInterval);
+    watchId=null;sendInterval=null;
+    document.getElementById('startBtn').style.display='block';
+    document.getElementById('stopBtn').style.display='none';
+    document.getElementById('busSelect').disabled=false;
+    setStatus('idle','Location sharing stopped.');
+    document.getElementById('coords').textContent='';
+    document.getElementById('lastSent').textContent='';
+  }
+
+  async function sendLocation(){
+    if(lastLat===null) return;
+    const bus=document.getElementById('busSelect').value;
+    try{
+      const r=await fetch('/api/update',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({bus,lat:lastLat,lng:lastLng})
+      });
+      if(r.ok) document.getElementById('lastSent').textContent='Last sent: '+new Date().toLocaleTimeString();
+    }catch(e){
+      document.getElementById('lastSent').textContent='⚠ Send failed';
+    }
+  }
+
+  function setStatus(type,msg){
+    const dot=document.getElementById('dot');
+    dot.className='dot';
+    if(type==='live') dot.classList.add('live');
+    if(type==='error') dot.classList.add('error');
+    document.getElementById('statusText').textContent=msg;
+  }
+
+  // Keep screen awake
+  if('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(()=>{});
+</script>
+</body>
+</html>
