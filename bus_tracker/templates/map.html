@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>{{ bus }} – Live Tracking</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gold:#c9a84c;--gold-light:#e8c97a;
+  --dark:#0a0c0f;--panel:#0f1216;
+  --text:#e8e4dc;--muted:#5a6478;--border:rgba(201,168,76,0.18);
+  --green:#22c55e;--red:#ef4444;--blue:#4285f4;--orange:#f59e0b;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;font-family:'Jost',sans-serif;color:var(--text);background:var(--dark);}
+.wrap{display:flex;height:100vh;width:100vw;}
+#map{flex:1;position:relative;}
+.panel{width:295px;flex-shrink:0;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+@media(max-width:680px){
+  .wrap{flex-direction:column;}
+  #map{height:50vh;flex:none;}
+  .panel{width:100%;flex:1;border-left:none;border-top:1px solid var(--border);}
+}
+
+.topbar{position:absolute;top:0;left:0;right:0;z-index:500;background:rgba(10,12,15,0.92);backdrop-filter:blur(18px);border-bottom:1px solid var(--border);padding:9px 12px;display:flex;align-items:center;gap:8px;}
+.bk{background:rgba(201,168,76,0.1);border:1px solid var(--border);color:var(--gold);width:30px;height:30px;border-radius:50%;font-size:12px;display:flex;align-items:center;justify-content:center;text-decoration:none;flex-shrink:0;}
+.bid{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;color:var(--gold-light);}
+.bsub{font-size:9px;color:var(--muted);margin-top:1px;}
+.dbadge{font-size:9px;color:var(--gold);border:1px solid var(--border);border-radius:4px;padding:2px 7px;background:rgba(201,168,76,0.07);white-space:nowrap;flex-shrink:0;}
+.sbadge{margin-left:auto;display:flex;align-items:center;gap:4px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:20px;padding:3px 9px;font-size:9px;letter-spacing:1px;text-transform:uppercase;}
+.sd{width:5px;height:5px;border-radius:50%;background:#374151;flex-shrink:0;}
+.sd.live{background:var(--green);animation:blink 1.5s infinite;}
+.sd.offline{background:var(--red);}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.2;}}
+
+.mctrl{position:absolute;top:58px;left:10px;z-index:400;background:rgba(10,12,15,0.92);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.mc{display:flex;align-items:center;gap:5px;padding:7px 11px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border:none;background:transparent;width:100%;cursor:pointer;border-bottom:1px solid var(--border);transition:all .2s;}
+.mc:last-child{border-bottom:none;}
+.mc.active{color:var(--gold);background:rgba(201,168,76,0.08);}
+.spd{position:absolute;top:58px;left:115px;z-index:400;background:rgba(10,12,15,0.92);border:1px solid var(--border);border-radius:8px;padding:6px 11px;text-align:center;}
+.spd-v{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--gold-light);}
+.spd-l{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+
+.ph{padding:11px 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.pt{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600;color:var(--gold-light);}
+.ps{font-size:9px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-top:2px;}
+.strip{display:flex;border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-top:9px;}
+.sc{flex:1;text-align:center;padding:6px 2px;border-right:1px solid var(--border);}
+.sc:last-child{border-right:none;}
+.sv{font-family:'Cormorant Garamond',serif;font-size:13px;font-weight:600;color:var(--gold-light);}
+.sk{font-size:7px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:1px;}
+
+.sl{flex:1;overflow-y:auto;padding:3px 0;}
+.sl::-webkit-scrollbar{width:2px;}
+.sl::-webkit-scrollbar-thumb{background:rgba(201,168,76,0.15);}
+.si{display:flex;align-items:stretch;padding:0 11px;cursor:pointer;transition:background .12s;}
+.si:hover{background:rgba(201,168,76,0.05);}
+.tl{width:24px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;}
+.tlt{width:2px;background:rgba(66,133,244,0.3);flex:1;min-height:5px;}
+.tlb{width:2px;background:rgba(66,133,244,0.3);flex:1;min-height:5px;}
+.tld{width:16px;height:16px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;border:2px solid;z-index:1;margin:1px 0;}
+.tld.passed{background:#161b22;border-color:#21262d;color:#3d4450;}
+.tld.nxt{background:var(--blue);border-color:var(--blue);color:#fff;animation:pdot 1.5s infinite;}
+.tld.ok{background:rgba(66,133,244,0.1);border-color:var(--blue);color:var(--blue);}
+.tld.lt{background:rgba(239,68,68,0.08);border-color:var(--red);color:var(--red);}
+.tld.col{background:var(--gold);border-color:var(--gold-light);color:var(--dark);}
+@keyframes pdot{0%,100%{box-shadow:0 0 0 2px rgba(66,133,244,.2);}50%{box-shadow:0 0 0 5px rgba(66,133,244,0);}}
+.sinfo{flex:1;padding:5px 0 5px 8px;border-bottom:1px solid rgba(255,255,255,0.03);}
+.si:last-child .sinfo{border-bottom:none;}
+.sn{font-size:12px;font-weight:500;color:var(--text);}
+.sn.p{color:#3d4450;}
+.sn.lt{color:var(--red);}
+.sm-sched{font-size:10px;color:var(--muted);margin-top:1px;}
+.sm-eta{display:flex;align-items:center;gap:4px;margin-top:1px;}
+.sm-eta-t{font-size:10px;color:var(--text);}
+.bg{font-size:7px;letter-spacing:.4px;text-transform:uppercase;padding:1px 4px;border-radius:2px;border:1px solid;}
+.bg.late{color:var(--red);background:rgba(239,68,68,0.07);border-color:rgba(239,68,68,0.25);}
+.bg.ok{color:var(--blue);background:rgba(66,133,244,0.07);border-color:rgba(66,133,244,0.25);}
+.bg.ps{color:#3d4450;border-color:#21262d;}
+.bg.nx{color:var(--blue);background:rgba(66,133,244,0.12);border-color:rgba(66,133,244,0.3);}
+
+.lbl{background:transparent!important;border:none!important;box-shadow:none!important;}
+.gn{background:rgba(10,12,15,0.9);color:#93c5fd;font-family:'Jost',sans-serif;font-size:10px;font-weight:500;padding:2px 6px;border-radius:3px;border:1px solid rgba(66,133,244,0.4);box-shadow:0 1px 5px rgba(0,0,0,.5);white-space:nowrap;}
+.gd{background:rgba(10,12,15,0.9);color:var(--gold-light);font-family:'Jost',sans-serif;font-size:11px;font-weight:500;padding:2px 8px;border-radius:3px;border:1px solid var(--border);box-shadow:0 2px 7px rgba(0,0,0,.5);white-space:nowrap;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div id="map">
+  <div class="topbar">
+    <a class="bk" href="/">←</a>
+    <div>
+      <div class="bid">{{ bus }} · {{ place }}</div>
+      <div class="bsub">Departs {{ depart }} · Arrives SNGCE 09:00</div>
+    </div>
+    <div class="dbadge">🕐 {{ depart }}</div>
+    <div class="sbadge">
+      <div class="sd offline" id="sd"></div>
+      <span id="st">Loading</span>
+    </div>
+  </div>
+  <div class="mctrl">
+    <button class="mc active" id="bSt" onclick="sm('street')">🗺️ Street</button>
+    <button class="mc" id="bSa" onclick="sm('satellite')">🛰️ Satellite</button>
+  </div>
+  <div class="spd"><div class="spd-v" id="spd">—</div><div class="spd-l">km/h</div></div>
+</div>
+
+<div class="panel">
+  <div class="ph">
+    <div class="pt">🚏 Route Stops</div>
+    <div class="ps" id="psub">Loading…</div>
+    <div class="strip">
+      <div class="sc"><div class="sv" id="dv">—</div><div class="sk">km left</div></div>
+      <div class="sc"><div class="sv" id="av">09:00</div><div class="sk">arrives</div></div>
+      <div class="sc"><div class="sv" id="cv">—</div><div class="sk">stops left</div></div>
+    </div>
+  </div>
+  <div class="sl" id="sl">
+    <div style="padding:18px;text-align:center;color:var(--muted);font-size:11px;">Loading…</div>
+  </div>
+</div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+const COLLEGE = {{ college|tojson }};
+const START   = {{ start|tojson }};
+const BUS     = "{{ bus }}";
+const PLACE   = "{{ place }}";
+const DEPART  = "{{ depart }}";
+const STOPS   = {{ stops|tojson }};  // [[lat,lng,name,HH:MM],...]
+
+// ── MAP SETUP ─────────────────────────────────────────────────────────────────
+const stL = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'});
+const saL = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'© Esri'});
+const map = L.map('map',{zoomControl:false}).setView(COLLEGE,12);
+stL.addTo(map);
+L.control.zoom({position:'bottomright'}).addTo(map);
+setTimeout(()=>map.invalidateSize(),300);
+window.addEventListener('resize',()=>map.invalidateSize());
+
+function sm(t){
+  if(t==='satellite'){map.removeLayer(stL);saL.addTo(map);}
+  else{map.removeLayer(saL);stL.addTo(map);}
+  document.getElementById('bSt').classList.toggle('active',t==='street');
+  document.getElementById('bSa').classList.toggle('active',t==='satellite');
+}
+
+// ── COLLEGE MARKER ────────────────────────────────────────────────────────────
+L.marker(COLLEGE,{icon:L.divIcon({
+  className:'lbl',
+  html:'<div style="font-size:26px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.8))">🏫</div>',
+  iconSize:[32,32],iconAnchor:[16,16]
+})}).addTo(map)
+  .bindTooltip('<div class="gd">🏫 SNGCE College · 09:00</div>',
+               {permanent:true,direction:'top',className:'lbl'});
+
+// ── BUS MARKER ────────────────────────────────────────────────────────────────
+const busM = L.marker(START,{
+  icon:L.divIcon({className:'lbl',
+    html:'<div style="font-size:28px;filter:drop-shadow(0 3px 8px rgba(0,0,0,.7))">🚌</div>',
+    iconSize:[34,34],iconAnchor:[17,17]}),
+  zIndexOffset:1000
+}).addTo(map);
+busM.bindTooltip('<div class="gd">📍 '+PLACE+' · Dep '+DEPART+'</div>',
+                 {permanent:true,direction:'top',className:'lbl'});
+
+// ── ROUTE + SNAPPED STOP DOTS ─────────────────────────────────────────────────
+let routeLine = null;
+let stopMarkers = [];
+let lastBusPos = null;
+let routeCoords = []; // store full route coords for snapping
+
+// Find closest point on route polyline to a given lat/lng
+function snapToRoute(lat, lng, coords){
+  let best = null, bestDist = Infinity;
+  for(let i=0; i<coords.length-1; i++){
+    const [lat1,lng1] = coords[i];
+    const [lat2,lng2] = coords[i+1];
+    const dlat = lat2-lat1, dlng = lng2-lng1;
+    const lenSq = dlat*dlat + dlng*dlng;
+    if(lenSq === 0){
+      const d = Math.hypot(lat-lat1, lng-lng1);
+      if(d < bestDist){ bestDist=d; best=[lat1,lng1]; }
+      continue;
+    }
+    const t = Math.max(0, Math.min(1, ((lat-lat1)*dlat + (lng-lng1)*dlng) / lenSq));
+    const nearLat = lat1 + t*dlat;
+    const nearLng = lng1 + t*dlng;
+    const d = Math.hypot(lat-nearLat, lng-nearLng);
+    if(d < bestDist){ bestDist=d; best=[nearLat,nearLng]; }
+  }
+  return best || [lat,lng];
+}
+
+// Place stop dots snapped onto the route line
+function placeStopMarkers(coords){
+  // Remove old stop markers
+  stopMarkers.forEach(m=>map.removeLayer(m));
+  stopMarkers=[];
+
+  STOPS.forEach((s,i)=>{
+    if(i===STOPS.length-1) return; // skip college
+
+    // Snap stop to nearest point on route
+    const [snapLat, snapLng] = snapToRoute(s[0], s[1], coords);
+
+    const dot = L.circleMarker([snapLat, snapLng],{
+      radius: 5,
+      color: '#4285f4',
+      fillColor: '#ffffff',
+      fillOpacity: 1,
+      weight: 2.5,
+      zIndexOffset: 500
+    }).addTo(map);
+
+    dot.bindTooltip(
+      `<div class="gn">${s[2]} · ${s[3]}</div>`,
+      {permanent:true, direction:'right', className:'lbl', offset:[7,0]}
+    );
+
+    stopMarkers.push(dot);
+  });
+}
+
+function drawRoute(lat, lng, force=false){
+  if(!force && lastBusPos){
+    if(Math.abs(lat-lastBusPos[0])+Math.abs(lng-lastBusPos[1]) < 0.0003) return;
+  }
+  lastBusPos=[lat,lng];
+
+  const url =
+    'https://router.project-osrm.org/route/v1/driving/'
+    + lng+','+lat+';'
+    + COLLEGE[1]+','+COLLEGE[0]
+    + '?overview=full&geometries=geojson';
+
+  fetch(url)
+    .then(r=>r.json())
+    .then(d=>{
+      if(!d.routes||!d.routes[0]) return;
+      const coords = d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+      routeCoords = coords;
+
+      // Draw route line
+      if(routeLine) map.removeLayer(routeLine);
+      routeLine = L.polyline(coords,{
+        color:'#4285f4',
+        weight:5,
+        opacity:0.92,
+        lineJoin:'round',
+        lineCap:'round'
+      }).addTo(map);
+
+      // Place stop dots ON the route line
+      placeStopMarkers(coords);
+
+      // Update distance
+      const km = (d.routes[0].distance/1000).toFixed(1);
+      document.getElementById('dv').textContent = km;
+    })
+    .catch(()=>{
+      if(routeLine) map.removeLayer(routeLine);
+      routeLine=L.polyline([[lat,lng],COLLEGE],{color:'#4285f4',weight:4,opacity:.6,dashArray:'6,4'}).addTo(map);
+    });
+}
+
+// ── STATUS ────────────────────────────────────────────────────────────────────
+function setStatus(type,txt){
+  document.getElementById('sd').className='sd '+type;
+  document.getElementById('st').textContent=txt;
+}
+
+// ── RENDER STOPS PANEL ────────────────────────────────────────────────────────
+function renderPanel(stops, isLive){
+  const el=document.getElementById('sl');
+  if(!stops||!stops.length){
+    el.innerHTML='<div style="padding:18px;text-align:center;color:var(--muted);font-size:11px;">No stops</div>';
+    return;
+  }
+
+  const rem=stops.filter(s=>!s.passed);
+  document.getElementById('cv').textContent=rem.length;
+  document.getElementById('psub').textContent=
+    isLive ? rem.length+' stops remaining · Live GPS'
+           : 'Scheduled timetable · Dep '+DEPART;
+
+  const col=stops[stops.length-1];
+  if(col&&col.eta_mins!=null&&isLive){
+    const arr=new Date(Date.now()+col.eta_mins*60000)
+                .toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('av').textContent=arr;
+  } else {
+    document.getElementById('av').textContent='09:00';
+  }
+
+  const nextI=stops.findIndex(s=>!s.passed);
+
+  el.innerHTML=stops.map((s,i)=>{
+    const isF=i===0, isL=i===stops.length-1;
+    const isN=i===nextI&&isLive, isPassed=s.passed, isCol=s.is_college;
+    let dc=isPassed?'passed':(isCol?'col':(isN?'nxt':(s.late?'lt':'ok')));
+    let ds=isPassed?'✓':(isCol?'🏫':(isN?'▶':(i+1)));
+    let nc=isPassed?'p':(s.late&&!isPassed?'lt':'');
+
+    let etaHtml='';
+    if(isPassed){
+      etaHtml=`<div class="sm-eta"><span class="sm-eta-t" style="color:var(--muted)">Passed</span><span class="bg ps">Done</span></div>`;
+    } else if(s.eta_mins!=null&&isLive){
+      const arr=new Date(Date.now()+s.eta_mins*60000)
+                  .toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+      const badge=isN?`<span class="bg nx">Next</span>`:
+                  s.late?`<span class="bg late">+${s.late_by}m late</span>`:
+                  `<span class="bg ok">On time</span>`;
+      etaHtml=`<div class="sm-eta"><span class="sm-eta-t">ETA ${arr} · ${s.eta_mins}min</span>${badge}</div>`;
+    }
+
+    return `
+    <div class="si" onclick="flyToStop(${i})">
+      <div class="tl">
+        <div class="tlt" style="${isF?'background:transparent':''}"></div>
+        <div class="tld ${dc}">${ds}</div>
+        <div class="tlb" style="${isL?'background:transparent':''}"></div>
+      </div>
+      <div class="sinfo">
+        <div class="sn ${nc}">${s.name}</div>
+        <div class="sm-sched">Scheduled: ${s.sched_time}</div>
+        ${etaHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function flyToStop(i){
+  if(i < stopMarkers.length){
+    const latlng = stopMarkers[i].getLatLng();
+    map.flyTo(latlng, 15, {duration:.7});
+  } else {
+    map.flyTo(COLLEGE, 15, {duration:.7});
+  }
+}
+
+// ── GPS POLL ──────────────────────────────────────────────────────────────────
+let first=true, cd=5;
+
+async function poll(){
+  try{
+    const r=await fetch('/api/location/'+BUS+'?t='+Date.now());
+    const d=await r.json();
+    document.getElementById('spd').textContent=d.live?d.speed:'—';
+
+    if(d.live){
+      busM.setLatLng([d.lat,d.lng]);
+      setStatus('live','Live');
+      drawRoute(d.lat,d.lng);
+    } else {
+      busM.setLatLng(START);
+      if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+      stopMarkers.forEach(m=>map.removeLayer(m));
+      stopMarkers=[];
+      lastBusPos=null;
+      setStatus('offline',d.ts?'Stopped':'No Signal');
+      drawRoute(START[0],START[1],true);
+    }
+
+    renderPanel(d.stops,d.live);
+
+    if(first){
+      first=false;
+      const pos=d.live?[d.lat,d.lng]:START;
+      const b=L.latLngBounds([pos,COLLEGE]);
+      STOPS.forEach(s=>b.extend([s[0],s[1]]));
+      map.fitBounds(b,{padding:[65,35]});
+      map.invalidateSize();
+    }
+  }catch(e){
+    setStatus('offline','Offline');
+  }
+}
+
+function tick(){cd--;if(cd<=0){cd=5;poll();}}
+poll();
+setInterval(tick,1000);
+</script>
+</body>
+</html>

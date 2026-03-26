@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>SNGCE Bus Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#c9a84c;
+    --gold-light:#e8c97a;
+    --dark:#0a0c0f;
+    --dark2:#12151a;
+    --dark3:#1c2028;
+    --text:#e8e4dc;
+    --muted:#7a7a7a;
+    --border:rgba(201,168,76,0.2);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    background:var(--dark);
+    font-family:'Jost',sans-serif;
+    color:var(--text);
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;
+  }
+  body::before{
+    content:'';position:fixed;inset:0;
+    background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(201,168,76,0.07) 0%,transparent 70%);
+    pointer-events:none;
+  }
+  .page{width:100%;max-width:400px;position:relative;z-index:1;animation:fadeUp .8s cubic-bezier(.16,1,.3,1) both;}
+
+  .header{text-align:center;margin-bottom:36px;}
+  .crest{
+    width:60px;height:60px;
+    background:linear-gradient(135deg,var(--gold),var(--gold-light));
+    border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:26px;margin:0 auto 18px;
+    box-shadow:0 0 40px rgba(201,168,76,0.2),0 0 0 1px var(--border);
+  }
+  .college-name{
+    font-family:'Jost',sans-serif;font-size:10px;
+    letter-spacing:4px;text-transform:uppercase;
+    color:var(--gold);margin-bottom:10px;font-weight:500;
+  }
+  h1{
+    font-family:'Cormorant Garamond',serif;
+    font-size:clamp(34px,9vw,46px);font-weight:600;
+    line-height:1.1;color:var(--text);
+  }
+  h1 em{font-style:italic;color:var(--gold-light);}
+  .divider{width:40px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:14px auto;}
+  .tagline{font-size:12px;font-weight:300;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
+
+  .card{
+    background:var(--dark2);border:1px solid var(--border);
+    border-radius:3px;padding:30px;position:relative;overflow:hidden;
+  }
+  .card::before,.card::after{content:'';position:absolute;width:18px;height:18px;}
+  .card::before{top:0;left:0;border-top:1px solid var(--gold);border-left:1px solid var(--gold);}
+  .card::after{bottom:0;right:0;border-bottom:1px solid var(--gold);border-right:1px solid var(--gold);}
+
+  .field-label{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;font-weight:500;}
+
+  .select-wrap{position:relative;margin-bottom:20px;}
+  .select-wrap::after{content:'▾';position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--gold);pointer-events:none;}
+  select{
+    width:100%;padding:13px 36px 13px 14px;
+    background:var(--dark3);border:1px solid var(--border);border-radius:2px;
+    color:var(--text);font-family:'Jost',sans-serif;font-size:14px;font-weight:300;
+    appearance:none;-webkit-appearance:none;cursor:pointer;outline:none;transition:border .2s;
+    letter-spacing:.5px;
+  }
+  select:focus{border-color:var(--gold);}
+  select option{background:#1c2028;}
+
+  #preview{
+    background:var(--dark3);border:1px solid var(--border);border-radius:2px;
+    padding:12px 14px;margin-bottom:20px;
+    display:flex;align-items:center;gap:10px;
+    opacity:0;transform:translateY(4px);transition:opacity .3s,transform .3s;pointer-events:none;
+  }
+  #preview.show{opacity:1;transform:translateY(0);}
+  .p-bus{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600;color:var(--gold-light);}
+  .p-from{font-size:11px;color:var(--muted);margin-top:2px;letter-spacing:.3px;}
+  .p-badge{margin-left:auto;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);border:1px solid var(--border);padding:3px 7px;border-radius:2px;flex-shrink:0;}
+
+  .btn{
+    display:block;width:100%;padding:14px;
+    font-family:'Jost',sans-serif;font-size:11px;font-weight:500;
+    letter-spacing:3px;text-transform:uppercase;
+    border:none;border-radius:2px;cursor:pointer;
+    text-align:center;text-decoration:none;transition:all .2s;margin-bottom:10px;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,var(--gold),var(--gold-light));color:var(--dark);
+    box-shadow:0 4px 20px rgba(201,168,76,0.2);
+  }
+  .btn-primary:hover{box-shadow:0 6px 28px rgba(201,168,76,0.35);transform:translateY(-1px);}
+  .btn-secondary{background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,.07);font-size:11px;}
+  .btn-secondary:hover{border-color:var(--border);color:var(--text);}
+
+  .live-row{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:18px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.4);}50%{box-shadow:0 0 0 5px rgba(34,197,94,0);}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="crest">🚌</div>
+    <div class="college-name">SNGCE College</div>
+    <h1>Bus <em>Tracker</em></h1>
+    <div class="divider"></div>
+    <p class="tagline">Real-time GPS &nbsp;·&nbsp; 11 Routes</p>
+  </div>
+
+  <div class="card">
+    <div class="field-label">Select Your Route</div>
+    <div class="select-wrap">
+      <select id="busSelect" onchange="updatePreview()">
+        <option value="">— Choose your bus —</option>
+        {% for bus_id, info in buses.items() %}
+        <option value="{{ bus_id }}" data-name="{{ info.name }}">{{ bus_id }} · {{ info.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div id="preview">
+      <span style="font-size:20px">🗺️</span>
+      <div>
+        <div class="p-bus" id="prevNum"></div>
+        <div class="p-from" id="prevFrom"></div>
+      </div>
+      <span class="p-badge">GPS Live</span>
+    </div>
+
+    <a class="btn btn-primary" href="#" onclick="goTrack(event)">Track This Bus</a>
+    <a class="btn btn-secondary" href="/driver">🚘 &nbsp; Driver — Share My Location</a>
+
+    <div class="live-row"><span class="live-dot"></span>Live tracking active</div>
+  </div>
+</div>
+<script>
+  function updatePreview(){
+    const sel=document.getElementById('busSelect'),val=sel.value,preview=document.getElementById('preview');
+    if(!val){preview.classList.remove('show');return;}
+    const opt=sel.options[sel.selectedIndex];
+    document.getElementById('prevNum').textContent=val;
+    document.getElementById('prevFrom').textContent='From '+opt.dataset.name+' → SNGCE College';
+    preview.classList.add('show');
+  }
+  function goTrack(e){
+    e.preventDefault();
+    const val=document.getElementById('busSelect').value;
+    if(!val){alert('Please select a bus first!');return;}
+    window.location.href='/map?bus='+val;
+  }
+</script>
+</body>
+</html>
